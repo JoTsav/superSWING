@@ -30,8 +30,15 @@ public class Main extends GameCore {//Entry point
     private GameAction moveRight;
     private GameAction jump;
     private GameAction exit;
+    private GameAction pause;
+    private GameAction restart;
     private int collectedStars=0;
     private int numLives=6;
+    private boolean paused = false;
+    // FPS tracking
+    private int frames = 0;
+    private long fpsTimer = 0;
+    private int fps = 0;
 
     public void init() {
         super.init();
@@ -53,16 +60,34 @@ public class Main extends GameCore {//Entry point
         moveRight = new GameAction("moveRight");
         jump = new GameAction("jump", GameAction.DETECT_INITAL_PRESS_ONLY);
         exit = new GameAction("exit", GameAction.DETECT_INITAL_PRESS_ONLY);
+        pause = new GameAction("pause", GameAction.DETECT_INITAL_PRESS_ONLY);
+        restart = new GameAction("restart", GameAction.DETECT_INITAL_PRESS_ONLY);
         InputManager inputManager = new InputManager(screen.getFullScreenWindow());
         inputManager.setCursor(InputManager.INVISIBLE_CURSOR);
         inputManager.mapToKey(moveLeft, KeyEvent.VK_LEFT);
         inputManager.mapToKey(moveRight, KeyEvent.VK_RIGHT);
         inputManager.mapToKey(jump, KeyEvent.VK_SPACE);
+        inputManager.mapToKey(jump, KeyEvent.VK_UP);
         inputManager.mapToKey(exit, KeyEvent.VK_ESCAPE);
+        inputManager.mapToKey(pause, KeyEvent.VK_P);
+        inputManager.mapToKey(restart, KeyEvent.VK_R);
     }
     private void checkInput(long elapsedTime) {
         if (exit.isPressed()) {
             stop();
+        }
+        if (pause.isPressed()) {
+            paused = !paused;
+        }
+        if (restart.isPressed()) {
+            map = mapLoader.reloadMap();
+            Creature p = (Creature) map.getPlayer();
+            p.setState(Creature.STATE_NORMAL);
+            numLives = Math.max(numLives, 1);
+            return;
+        }
+        if (paused) {
+            return;
         }
         Player player = (Player)map.getPlayer();
         if (player.isAlive()) {
@@ -82,14 +107,26 @@ public class Main extends GameCore {//Entry point
     }
     public void draw(Graphics2D g) {
         drawer.draw(g, map, screen.getWidth(), screen.getHeight());
+        // HUD
+        g.setColor(new Color(0,0,0,150));
+        g.fillRoundRect(6, 6, 820, 28, 10, 10);
         g.setColor(Color.WHITE);
-        g.drawString("Press ESC for EXIT.",10.0f,20.0f);
+        g.drawString("ESC: Exit  |  P: Pause/Resume  |  R: Restart  |  Arrows: Move  |  Space/Up: Jump", 14.0f, 26.0f);
         g.setColor(Color.GREEN);
-        g.drawString("Coins: "+collectedStars,300.0f,20.0f);
+        g.drawString("Coins: "+collectedStars,300.0f,50.0f);
         g.setColor(Color.YELLOW);
-        g.drawString("Lives: "+(numLives),500.0f,20.0f );
+        g.drawString("Lives: "+(numLives),500.0f,50.0f );
         g.setColor(Color.WHITE);
-        g.drawString("Home: "+mapLoader.currentMap,700.0f,20.0f);
+        g.drawString("Level: "+mapLoader.currentMap+"  FPS: "+fps,650.0f,50.0f);
+        if (paused) {
+            g.setColor(new Color(0,0,0,160));
+            g.fillRect(0,0,screen.getWidth(),screen.getHeight());
+            g.setColor(Color.WHITE);
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 48f));
+            g.drawString("PAUSED", screen.getWidth()/2f - 110, screen.getHeight()/2f);
+            g.setFont(g.getFont().deriveFont(Font.PLAIN, 18f));
+            g.drawString("Press P to resume", screen.getWidth()/2f - 100, screen.getHeight()/2f + 40);
+        }
     }
     /**
      * Gets the current map.
@@ -175,14 +212,26 @@ public class Main extends GameCore {//Entry point
      * in the current map.
      */
     public void update(long elapsedTime) {
+        // FPS counter
+        frames++;
+        fpsTimer += elapsedTime;
+        if (fpsTimer >= 1000) {
+            fps = frames;
+            frames = 0;
+            fpsTimer -= 1000;
+        }
         Creature player = (Creature)map.getPlayer();
         // player is dead! start map over
         if (player.getState() == Creature.STATE_DEAD) {
             map = mapLoader.reloadMap();
+            paused = false;
             return;
         }
         // get keyboard/mouse input
         checkInput(elapsedTime);
+        if (paused) {
+            return;
+        }
         // update player
         updateCreature(player, elapsedTime);
         player.update(elapsedTime);

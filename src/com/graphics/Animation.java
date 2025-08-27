@@ -3,7 +3,7 @@ package com.graphics;
 import java.awt.*;
 import java.util.ArrayList;
 
-public class Animation {
+public class  Animation {
     private final ArrayList frames;
     private int currFrameIndex;
     private long animTime;
